@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { FiArrowLeft } from "react-icons/fi";
 import { Map, TileLayer, Marker } from "react-leaflet";
 import api from "../../services/api";
+import axios from "axios";
 
 import "./styles.css";
 import logo from "../../assets/logo.svg";
@@ -16,6 +17,14 @@ interface Item {
   image_url: string;
 }
 
+interface IBGEUFResponse {
+  sigla: string;
+}
+
+interface IBGECityResponse {
+  nome: string;
+}
+
 const CreatePoint = () => {
   /*  USING STATES TO STORE/HANDLE DATA WITHIN THE COMPONENT
       the state is a deconstructed function that takes two parameters:
@@ -23,6 +32,9 @@ const CreatePoint = () => {
       2. the function that we use to change the the value of the state (setItem)
   */
   const [items, setItem] = useState<Item[]>([]);
+  const [ufs, setUfs] = useState<string[]>([]);
+  const [selectedUf, setSelectedUf] = useState("0");
+  const [cities, setCities] = useState<string[]>([]);
 
   // useEffect is a function that takes two params: A function to execute and the value that will trigger this function whenever
   // the value change. If we leave the value empty [], the function will only execute once (when the component loads).
@@ -31,6 +43,40 @@ const CreatePoint = () => {
       setItem(response.data); //setItem is used to change the state of items
     });
   }, []);
+
+  //useEffect for retrieving the UFs from the API and updating the state ufs
+  useEffect(() => {
+    axios
+      .get<IBGEUFResponse[]>(
+        "https://servicodados.ibge.gov.br/api/v1/localidades/estados/"
+      )
+      .then((response) => {
+        const ufInititals = response.data.map((uf) => uf.sigla);
+        setUfs(ufInititals);
+      });
+  }, []);
+
+  // in this case, we want this to be called every time the user select a state so in the second argument I have passed
+  // selectedUf. Hence, every time the value of selectedUf changes, the function will be executed (axios.get)
+  useEffect(() => {
+    if (selectedUf === "0") {
+      return;
+    }
+    axios
+      .get<IBGECityResponse[]>(
+        `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedUf}/municipios`
+      )
+      .then((response) => {
+        const cityNames = response.data.map((city) => city.nome);
+        setCities(cityNames);
+      });
+  }, [selectedUf]);
+
+  function handleSelectUf(event: ChangeEvent<HTMLSelectElement>) {
+    const uf = event.target.value;
+
+    setSelectedUf(uf);
+  }
 
   return (
     <div id="page-create-point">
@@ -87,8 +133,13 @@ const CreatePoint = () => {
           <div className="field-group">
             <div className="field">
               <label htmlFor="state">State</label>
-              <select name="state" id="uf">
+              <select name="state" id="uf" value={selectedUf} onChange={handleSelectUf}>
                 <option value="0">Select a state</option>
+                {ufs.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -96,6 +147,11 @@ const CreatePoint = () => {
               <label htmlFor="city">City</label>
               <select name="city" id="city">
                 <option value="0">Select a city</option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
